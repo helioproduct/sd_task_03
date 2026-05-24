@@ -1,215 +1,139 @@
-# REST API почтового сервиса
+# Лабораторная работа 3. Проектирование и оптимизация реляционной БД
 
-Третья лабораторная для варианта 9. Основа осталась компактной: один HTTP-сервис на `userver`, но хранилище переведено на `PostgreSQL`, а рядом добавлены SQL-артефакты для схемы, данных и оптимизации.
+Вариант 9: электронная почта.
 
-## Что умеет сервис
+В работе спроектирована реляционная база данных для почтового сервиса. Основные сущности:
 
-- `POST /api/v1/users` - создать пользователя
-- `POST /api/v1/auth/login` - получить токен
-- `GET /api/v1/users/by-login?login=...` - найти пользователя по логину
-- `GET /api/v1/users/search?mask=...` - найти пользователей по маске имени или фамилии
-- `POST /api/v1/folders` - создать папку
-- `GET /api/v1/folders` - получить список папок текущего пользователя
-- `POST /api/v1/folders/{folder_id}/messages` - создать письмо в папке
-- `GET /api/v1/folders/{folder_id}/messages` - получить письма из папки
-- `GET /api/v1/messages/{message_id}` - получить письмо по идентификатору
+- пользователь
+- почтовая папка
+- сообщение
 
-## Технологии
+## Обязательные файлы
 
-- C++20
-- userver
-- PostgreSQL 16
-- Docker Compose
-- pytest
+- `schema.sql` - создание схемы БД, ограничений и индексов
+- `data.sql` - тестовые данные
+- `queries.sql` - SQL-запросы для операций варианта
+- `optimization.md` - описание оптимизаций и планы выполнения `EXPLAIN`
+- `README.md` - описание схемы и инструкция по запуску
 
-## Структура проекта
+## Структура БД
 
-```text
-.
-├── src/
-│   ├── api/
-│   ├── domain/
-│   └── main.cpp
-├── configs/
-│   ├── static_config.yaml
-│   └── dynamic_config_fallback.json
-├── db/
-│   └── Dockerfile
-├── tests/
-│   └── test_api.py
-├── CMakeLists.txt
-├── Dockerfile
-├── data.sql
-├── docker-compose.yaml
-├── optimization.md
-├── openapi.yaml
-├── queries.sql
-├── schema.sql
-└── TASK_INFO.md
-```
+### `users`
 
-## Что добавлено в lab 3
+Хранит пользователей системы.
 
-- `schema.sql` с таблицами, внешними ключами, `CHECK` и индексами
-- `data.sql` с тестовыми записями
-- `queries.sql` с SQL для всех операций API
-- `optimization.md` с пояснением по индексам и `EXPLAIN`
-- контейнер `postgres`, к которому подключается API
+Поля:
 
-## Примеры запросов
+- `id` - первичный ключ
+- `login` - уникальный логин
+- `email` - уникальный email
+- `first_name` - имя
+- `last_name` - фамилия
+- `password_hash` - хэш пароля
+- `created_at` - дата создания записи
 
-Создание пользователя:
+Ограничения:
 
-```bash
-curl -X POST http://localhost:8080/api/v1/users \
-  -H "Content-Type: application/json" \
-  -d '{
-    "login": "ivan",
-    "email": "ivan@example.com",
-    "first_name": "Ivan",
-    "last_name": "Petrov",
-    "password": "qwerty123"
-  }'
-```
+- `UNIQUE` для `login` и `email`
+- `CHECK` на непустые строковые поля
+- `CHECK` на базовую корректность email
 
-Логин:
+### `folders`
 
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "login": "ivan",
-    "password": "qwerty123"
-  }'
-```
+Хранит папки пользователя.
 
-## Запуск и проверка
+Поля:
 
-### Запуск проекта
+- `id` - первичный ключ
+- `user_id` - владелец папки
+- `name` - имя папки
+- `created_at` - дата создания
+
+Ограничения:
+
+- внешний ключ на `users(id)`
+- уникальность имени папки в рамках одного пользователя
+
+### `messages`
+
+Хранит письма.
+
+Поля:
+
+- `id` - первичный ключ
+- `folder_id` - папка, в которой лежит сообщение
+- `sender_id` - отправитель
+- `recipient_email` - email получателя
+- `subject` - тема письма
+- `body` - текст письма
+- `is_sent` - флаг отправки
+- `created_at` - дата создания
+
+Ограничения:
+
+- внешний ключ на `folders(id)`
+- внешний ключ на `users(id)`
+- `CHECK` на непустые тему и тело
+- `CHECK` на базовую корректность email получателя
+
+## Индексы
+
+В схеме используются следующие индексы:
+
+- `users_login_key` и `users_email_key` создаются автоматически через `UNIQUE`
+- `idx_users_full_name_lookup` для поиска пользователя по маске
+- `idx_folders_owner_id` для выборки папок пользователя
+- `idx_messages_folder_id` для выборки писем по папке
+- `idx_messages_sender_id` для выборки писем по отправителю
+- `idx_messages_folder_created_at` для выборки писем в папке с сортировкой по дате
+
+## Запуск PostgreSQL
+
+Для локального запуска используется `docker-compose.yaml`.
+
+Поднять контейнер:
 
 ```bash
 docker compose up --build -d
 ```
 
-Сначала поднимется `postgres`, затем API-сервис `mail-lab`.
-
-### Проверка статуса
+Проверить статус:
 
 ```bash
 docker compose ps
 ```
 
-Оба контейнера должны быть в статусе `healthy`.
-
-### Тестирование
-
-Основной сценарий:
-
-```bash
-docker compose exec mail-lab pytest tests -v
-```
-
-### Swagger UI
-
-Откройте в браузере: http://localhost:8080/swagger
-
-## SQL-файлы
-
-Проверить схему и данные можно так:
-
-```bash
-docker compose exec postgres psql -U mail_user -d mail_lab_db -c "\dt"
-docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from users;"
-docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from folders;"
-docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from messages;"
-```
-
-### Остановка
+Остановить контейнер:
 
 ```bash
 docker compose down
 ```
 
-## Оптимизация запросов
+## Проверка схемы и данных
 
-### Что оптимизировалось
+Посмотреть таблицы:
 
-Основные запросы в сервисе:
-
-1. поиск пользователя по логину
-2. поиск пользователя по маске имени
-3. получение папок пользователя
-4. получение писем в папке
-5. получение письма по идентификатору
-
-### Индексы и зачем они нужны
-
-- `users(login)` и `users(email)` создаются автоматически за счет `UNIQUE`
-- `idx_users_full_name_lookup` ускоряет поиск по `mask`
-- `idx_folders_owner_id` ускоряет выборку папок по `user_id`
-- `idx_messages_folder_id` ускоряет фильтрацию писем по папке
-- `idx_messages_sender_id` ускоряет связи с отправителем
-- `idx_messages_folder_created_at` покрывает частый запрос `WHERE folder_id = ? ORDER BY created_at DESC`
-
-### EXPLAIN до и после
-
-#### Поиск пользователя по логину
-
-До индекса:
-
-```sql
-EXPLAIN SELECT id, login, email FROM users WHERE login = 'alex.ivanov';
+```bash
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "\dt"
 ```
 
-Типичный план:
+Проверить количество записей:
 
-```text
-Seq Scan on users
-  Filter: (login = 'alex.ivanov')
+```bash
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from users;"
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from folders;"
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from messages;"
 ```
 
-После индекса:
+Выполнить произвольный запрос:
 
-```text
-Index Scan using users_login_key on users
-  Index Cond: (login = 'alex.ivanov')
+```bash
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select u.login, f.name, m.subject from users u join folders f on f.user_id = u.id join messages m on m.folder_id = f.id order by u.id, f.id, m.id limit 10;"
 ```
 
-#### Получение папок пользователя
+## Содержимое SQL-артефактов
 
-До индекса:
-
-```text
-Seq Scan on folders
-  Filter: (user_id = 1)
-```
-
-После индекса `idx_folders_owner_id`:
-
-```text
-Index Scan using idx_folders_owner_id on folders
-  Index Cond: (user_id = 1)
-```
-
-#### Получение писем в папке
-
-До индекса:
-
-```text
-Seq Scan on messages
-  Filter: (folder_id = 1)
-  Sort Key: created_at DESC
-```
-
-После составного индекса:
-
-```text
-Index Scan using idx_messages_folder_created_at on messages
-  Index Cond: (folder_id = 1)
-```
-
-Отдельная операция сортировки больше не нужна, потому что строки читаются уже в нужном порядке.
-
-### Вывод
-
-Для этой модели самый важный индекс - `idx_messages_folder_created_at`, потому что запрос списка писем выполняется чаще других и одновременно фильтрует по папке и сортирует по дате. Остальные индексы закрывают поиск пользователя и выборки по внешним ключам.
+- `schema.sql` создает таблицы `users`, `folders`, `messages`
+- `data.sql` заполняет таблицы тестовыми данными
+- `queries.sql` содержит запросы на создание пользователя, поиск пользователя, создание папки, создание и чтение писем
+- `optimization.md` объясняет, какие индексы добавлены и как они влияют на планы выполнения
