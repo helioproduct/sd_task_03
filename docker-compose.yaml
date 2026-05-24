@@ -1,0 +1,15 @@
+services:
+  mail-lab:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mail-lab
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    volumes:
+      - mail_lab_data:/app/data
+
+volumes:
+  mail_lab_data:

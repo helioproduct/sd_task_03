@@ -1,0 +1,310 @@
+openapi: 3.0.3
+info:
+  title: Mail Portal API
+  version: 1.0.0
+  description: REST API для упрощенного почтового сервиса.
+servers:
+  - url: http://localhost:8080
+paths:
+  /ping:
+    get:
+      summary: Проверка доступности сервиса
+      responses:
+        "200":
+          description: Сервис работает
+          content:
+            text/plain:
+              schema:
+                type: string
+  /api/v1/users:
+    post:
+      summary: Создать нового пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /api/v1/auth/login:
+    post:
+      summary: Выполнить вход
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Авторизация успешна
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Неверные учетные данные
+  /api/v1/users/by-login:
+    get:
+      summary: Найти пользователя по логину
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: login
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Пользователь найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: Пользователь не найден
+  /api/v1/users/search:
+    get:
+      summary: Поиск пользователей по маске имени или фамилии
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: mask
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Результаты поиска
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+  /api/v1/folders:
+    post:
+      summary: Создать папку
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFolderRequest"
+      responses:
+        "201":
+          description: Папка создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Folder"
+    get:
+      summary: Получить список папок пользователя
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Список папок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Folder"
+  /api/v1/folders/{folderId}/messages:
+    post:
+      summary: Создать письмо в папке
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: folderId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMessageRequest"
+      responses:
+        "201":
+          description: Письмо создано
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+    get:
+      summary: Получить письма из папки
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: folderId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Список писем
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+  /api/v1/messages/{messageId}:
+    get:
+      summary: Получить письмо по идентификатору
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Письмо найдено
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "404":
+          description: Письмо не найдено
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: Ошибка валидации
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Конфликт данных
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    CreateUserRequest:
+      type: object
+      required: [login, email, first_name, last_name, password]
+      properties:
+        login:
+          type: string
+        email:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        password:
+          type: string
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user_id:
+          type: integer
+        expires_at:
+          type: string
+      required: [token, user_id, expires_at]
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        login:
+          type: string
+        email:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        created_at:
+          type: string
+      required: [id, login, email, first_name, last_name, created_at]
+    CreateFolderRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    Folder:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        user_id:
+          type: integer
+        created_at:
+          type: string
+      required: [id, name, user_id, created_at]
+    CreateMessageRequest:
+      type: object
+      required: [subject, body, recipient_email]
+      properties:
+        subject:
+          type: string
+        body:
+          type: string
+        recipient_email:
+          type: string
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+        body:
+          type: string
+        recipient_email:
+          type: string
+        folder_id:
+          type: integer
+        created_at:
+          type: string
+      required: [id, subject, body, recipient_email, folder_id, created_at]
