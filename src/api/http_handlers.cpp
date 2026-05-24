@@ -3,9 +3,11 @@
 #include <fstream>
 #include <optional>
 
+#include <userver/components/component_context.hpp>
 #include <userver/formats/json.hpp>
 #include <userver/formats/json/value_builder.hpp>
 #include <userver/http/common_headers.hpp>
+#include <userver/storages/postgres/component.hpp>
 #include <userver/server/http/http_status.hpp>
 #include <userver/utils/datetime.hpp>
 
@@ -16,8 +18,8 @@ namespace mail_lab::api {
 
 namespace {
 
-std::shared_ptr<domain::MailRepository> SharedStorage() {
-    static auto storage = std::make_shared<domain::MailRepository>("/app/data/mail.db");
+std::shared_ptr<domain::MailRepository> SharedStorage(userver::storages::postgres::ClusterPtr pg_cluster) {
+    static auto storage = std::make_shared<domain::MailRepository>(std::move(pg_cluster));
     return storage;
 }
 
@@ -62,7 +64,7 @@ bool IsEmailValid(const std::string& value) {
 
 int64_t ParseIdOrReject(const userver::server::http::HttpRequest& request,
                         const std::string& raw,
-                        const std::string& error_text,
+                        const std::string&,
                         bool& ok) {
     try {
         ok = true;
@@ -83,7 +85,8 @@ std::string LoadFile(const std::string& path) {
 
 JsonApiHandlerBase::JsonApiHandlerBase(const userver::components::ComponentConfig& config,
                                        const userver::components::ComponentContext& context)
-    : HttpHandlerBase(config, context), storage_(SharedStorage()) {}
+    : HttpHandlerBase(config, context),
+      storage_(SharedStorage(context.FindComponent<userver::components::Postgres>("postgres-db").GetCluster())) {}
 
 std::string SignupHandler::HandleRequestThrow(const userver::server::http::HttpRequest& request,
                                               userver::server::request::RequestContext&) const {

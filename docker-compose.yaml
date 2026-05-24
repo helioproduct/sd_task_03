@@ -1,15 +1,43 @@
 services:
+  postgres:
+    build:
+      context: .
+      dockerfile: db/Dockerfile
+    container_name: mail-lab-postgres
+    environment:
+      POSTGRES_DB: mail_lab_db
+      POSTGRES_USER: mail_user
+      POSTGRES_PASSWORD: mail_pass
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mail_user -d mail_lab_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   mail-lab:
     platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
     container_name: mail-lab
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8080:8080"
     restart: unless-stopped
-    volumes:
-      - mail_lab_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
-  mail_lab_data:
+  postgres_data:

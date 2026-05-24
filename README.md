@@ -1,6 +1,6 @@
 # REST API почтового сервиса
 
-Простая реализация варианта 9 на `C++`, `userver` и `SQLite`. Решение специально сделано компактным: один HTTP-сервис, одна локальная база и минимальная структура проекта без разделения на несколько микросервисов.
+Третья лабораторная для варианта 9. Основа осталась компактной: один HTTP-сервис на `userver`, но хранилище переведено на `PostgreSQL`, а рядом добавлены SQL-артефакты для схемы, данных и оптимизации.
 
 ## Что умеет сервис
 
@@ -18,7 +18,7 @@
 
 - C++20
 - userver
-- SQLite
+- PostgreSQL 16
 - Docker Compose
 - pytest
 
@@ -33,15 +33,28 @@
 ├── configs/
 │   ├── static_config.yaml
 │   └── dynamic_config_fallback.json
+├── db/
+│   └── Dockerfile
 ├── tests/
 │   └── test_api.py
 ├── CMakeLists.txt
 ├── Dockerfile
+├── data.sql
 ├── docker-compose.yaml
+├── optimization.md
 ├── openapi.yaml
-├── QUICK_START.md
+├── queries.sql
+├── schema.sql
 └── TASK_INFO.md
 ```
+
+## Что добавлено в lab 3
+
+- `schema.sql` с таблицами, внешними ключами, `CHECK` и индексами
+- `data.sql` с тестовыми записями
+- `queries.sql` с SQL для всех операций API
+- `optimization.md` с пояснением по индексам и `EXPLAIN`
+- контейнер `postgres`, к которому подключается API
 
 ## Примеры запросов
 
@@ -77,4 +90,15 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 ```bash
 docker compose up --build -d
 docker compose exec mail-lab pytest tests -v
+```
+
+## SQL-файлы
+
+Проверить схему и данные можно так:
+
+```bash
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "\dt"
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from users;"
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from folders;"
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from messages;"
 ```

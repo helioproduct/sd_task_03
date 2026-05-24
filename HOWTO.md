@@ -1,11 +1,10 @@
-
 ## Запуск проекта
 
 ```bash
 docker compose up --build -d
 ```
 
-Подождите 20-30 секунд, пока соберётся образ и сервис начнёт отвечать на `ping`.
+Сначала поднимется `postgres`, затем API-сервис `mail-lab`.
 
 ## Проверка статуса
 
@@ -13,7 +12,7 @@ docker compose up --build -d
 docker compose ps
 ```
 
-Сервис `mail-lab` должен быть в статусе `running` или `healthy`.
+Оба контейнера должны быть в статусе `healthy`.
 
 ## Тестирование
 
@@ -21,6 +20,13 @@ docker compose ps
 
 ```bash
 docker compose exec mail-lab pytest tests -v
+```
+
+Проверка SQL-данных:
+
+```bash
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "\dt"
+docker compose exec postgres psql -U mail_user -d mail_lab_db -c "select count(*) from users;"
 ```
 
 ## Swagger UI

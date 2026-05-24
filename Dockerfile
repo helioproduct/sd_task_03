@@ -2,12 +2,11 @@ FROM ghcr.io/userver-framework/ubuntu-22.04-userver-pg-dev:latest
 
 RUN apt-get update && \
     apt-get install -y \
-    libsqlite3-dev \
-    sqlite3 \
     wget \
     libssl-dev \
     git \
     nlohmann-json3-dev \
+    postgresql-client \
     python3 \
     python3-pip && \
     rm -rf /var/lib/apt/lists/* && \
@@ -35,14 +34,13 @@ COPY . /app
 RUN mkdir -p /app/build && \
     cd /app/build && \
     cmake -DCMAKE_BUILD_TYPE=Release \
-          -DUSERVER_FEATURE_POSTGRESQL=OFF \
+          -DUSERVER_FEATURE_POSTGRESQL=ON \
           -DUSERVER_FEATURE_TESTSUITE=OFF \
           -DUSERVER_FEATURE_FORMAT=OFF \
           .. && \
     make -j2 && \
     cp /app/build/mail-lab /app/mail-lab && \
-    chmod +x /app/mail-lab && \
-    mkdir -p /app/data
+    chmod +x /app/mail-lab
 
 HEALTHCHECK --interval=20s --timeout=5s --start-period=15s --retries=5 \
     CMD wget --quiet --tries=1 --spider http://127.0.0.1:8080/ping || exit 1

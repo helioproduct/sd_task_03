@@ -26,6 +26,18 @@ components_manager:
                     level: info
                     overflow_behavior: discard
 
+        dns-client:
+            fs-task-processor: fs-task-processor
+
+        postgres-db:
+            dbconnection: 'postgresql://mail_user:mail_pass@postgres:5432/mail_lab_db'
+            blocking_task_processor: fs-task-processor
+            dns_resolver: async
+            max_pool_size: 16
+            min_pool_size: 4
+
+        testsuite-support: {}
+
         handler-ping-text:
             path: /ping
             method: GET

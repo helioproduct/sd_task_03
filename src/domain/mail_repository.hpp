@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include <sqlite3.h>
+#include <userver/storages/postgres/cluster.hpp>
 
 #include "entities.hpp"
 
@@ -12,8 +12,8 @@ namespace mail_lab::domain {
 
 class MailRepository {
 public:
-    explicit MailRepository(const std::string& db_path);
-    ~MailRepository();
+    explicit MailRepository(userver::storages::postgres::ClusterPtr pg_cluster);
+    ~MailRepository() = default;
 
     std::optional<UserRecord> CreateUser(const UserDraft& draft);
     std::optional<UserRecord> FindUserByLogin(const std::string& login);
@@ -31,12 +31,9 @@ public:
     std::optional<MessageRecord> FindMessageById(int64_t message_id);
 
 private:
-    sqlite3* db_{nullptr};
+    userver::storages::postgres::ClusterPtr pg_cluster_;
 
-    void InitSchema();
-    bool RunSql(const std::string& sql);
     std::string HashPassword(const std::string& password) const;
-    std::optional<int64_t> LastInsertId() const;
 };
 
 }  // namespace mail_lab::domain
